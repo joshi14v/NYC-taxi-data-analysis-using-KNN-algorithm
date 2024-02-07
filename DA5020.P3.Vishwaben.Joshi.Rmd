@@ -1,0 +1,383 @@
+---
+title: "Group 7 practicum 3"
+output: html_document
+date: "2022-08-14"
+---
+
+```{r}
+#install.packages("caret")
+#install.packages("class")
+##install.packages("questionr")
+##install.packages("FNN")
+library(tidyverse)
+library(ggplot2)
+library(caret)
+library(class)
+library(psych)
+library(dplyr)
+library(lubridate)
+##install.packages("fastDummies")
+library(fastDummies)
+library(readr)
+library(tidyr)
+library(corrplot)
+##install.packages("mlbench")
+library(mlbench)
+##install.packages("reshape2")
+library(reshape2)
+##install.packages("Hmisc")
+##library(Hmisc)
+library(base)
+library(lubridate)
+##install.packages("moments")
+##library(moments)
+library(RCurl)
+library(gmodels)
+
+```
+
+
+QUESTION 1:CRISP-DM: Data Understanding 
+
+### Load the NYC Green Taxi Trip Records data  into a data frame or tibble. 
+
+```{r}
+## load the NYC trip data 
+setwd("/Users/vishwajoshi")
+tripdata_1 <- read.csv("taxi.csv", header = TRUE)
+tripdata_1 <- data.frame(tripdata_1)
+head(tripdata_1)
+
+
+## Target Variable TIP AMOUNT distribution analysis
+str(tripdata_1)
+summary(tripdata_1)
+## data has 1048575 observation and 19 variables. Tip amount is numeric data type with minimum value of -2.720 and max 295.
+
+```
+
+###Data exploration: explore the data to identify any patterns and analyze the relationships between the 
+features and the target variable i.e. tip amount. At a minimum, you should analyze: 1) the distribution, 
+2) the correlations 3) missing values and 4) outliers — provide supporting visualizations and explain 
+all your steps. 
+```{r}
+###########Creating graphs for distribution#########
+
+##visualization of vendor_ID
+plot_1 <- ggplot(tripdata_1 , aes(VendorID)) + 
+  geom_bar( width = 0.2,stat = "count", fill ="blue") +
+  labs(title = " Total distribution of VendorID") 
+plot_1
+
+
+##plotting the payment_type with the help of a barplot.
+plot_3 <- ggplot(tripdata_1, aes(payment_type, ..count..)) + geom_bar(fill ="blue") +
+  geom_text(aes(label = ..count..),vjust = 1.0,colour = "black", stat = "count") +  labs(title = "Distribution of payment_type")
+plot_3
+##it is evident from the graph that tehre are 5 type of payment_type, and the 2 which are most common are credit card and cash.
+
+
+##store_and_fwd_flag plot
+plot_4 <- ggplot(tripdata_1, aes(store_and_fwd_flag, ..count..)) + geom_bar(fill ="blue") + geom_text(aes(label = ..count..),colour = "black", stat = "count") + 
+  labs(title = "Distribution of store_and_fwd_flag") 
+plot_4
+
+##ratecodeid distribution plot
+plot_5 <- ggplot(tripdata_1, aes( RatecodeID)) + 
+  geom_bar(width = 0.5,fill ="blue", stat = "count" )  + 
+  labs(title = "Distribution of store_and_fwd_flag") 
+plot_5
+
+##PULocationID plot
+plot_6 <- ggplot(tripdata_1, aes( PULocationID)) + geom_histogram(color = "black",fill="blue", bins = 20) + 
+  labs(title = "Distribution of PULocationID") 
+plot_6
+
+##DOLocationID plot
+plot_7 <- ggplot(tripdata_1, aes( DOLocationID)) + geom_histogram(color = "black",fill="blue", bins = 20) + 
+  labs(title = "Distribution of DOLocationID") 
+plot_7
+
+##passenger count plot
+plot_8 <- ggplot(tripdata_1, aes(passenger_count)) + geom_bar(fill="blue", bins = 20)  +
+  labs(title = "Distribution of PULocationID") 
+plot_8
+## FROM THE GRAPH IT IS CLEAR THAT THE PASSENGER COUNT RANGES BETWEEN 0 TO 6.
+
+##trip_distance plot
+plot_9 <- ggplot(tripdata_1, aes(trip_distance)) + geom_histogram(fill="blue", bins = 20)  +
+  labs(title = "Distribution of trip_distance") 
+plot_9
+
+##fare_amount plot
+plot_10 <- ggplot(tripdata_1, aes(fare_amount)) + geom_bar(fill="blue", width = 20)  +
+  labs(title = "Distribution of fare_amount") 
+plot_10
+
+##extra plot
+plot_11 <- ggplot(tripdata_1, aes(extra)) + geom_bar(fill="blue", bins = 2)  +
+  labs(title = "Distribution of extra") 
+plot_11
+
+##plotting the distribution of tip_amount through a histogram.
+plot_12 <- ggplot(tripdata_1, aes(tip_amount)) + 
+  geom_histogram(color = "black",fill="blue", bins = 10) + labs(title = "Distribution of tip_amount") 
+plot_12
+##the maximum tip amount turns put to be zero
+```
+
+```{r}
+########### MISSING VALUES ##############
+## finding columns containing missing values
+for (col in colnames (tripdata_1)) {
+  if (any(is.na(tripdata_1[, col]))) {
+    print (col)
+  }
+}
+## total missing value in both the 2 columns containing missing value
+sum(is.na(tripdata_1$ehail_fee))
+sum(is.na(tripdata_1$trip_type))
+## delete column ehail_fee containing all missing values.
+tripdata_1 <- tripdata_1[, -c(15)]
+## trip_type has only one unique data 1. converting NA to 1
+tripdata_1$trip_type[which(is.na(tripdata_1$trip_type))] <- 1
+## o missing value in the data
+sum(is.na(tripdata_1))
+
+```
+
+```{r}
+############# OUTLIERS #############
+
+## converting data type to numerical 
+tripdata_1$fare_amount <- suppressWarnings(as.numeric(tripdata_1$fare_amount))
+tripdata_1$total_amount <- suppressWarnings(as.numeric(tripdata_1$total_amount))
+tripdata_1$lpep_pickup_datetime <- mdy_hm(tripdata_1$lpep_pickup_datetime)
+tripdata_1$lpep_dropoff_datetime <- mdy_hm(tripdata_1$lpep_dropoff_datetime)
+tripdata_1 <- tripdata_1[, -c(4)]
+str(tripdata_1)
+
+#creating a data frame of z score all values
+z_score <- as.data.frame(sapply(tripdata_1[,8:15], function(z)(abs(z-mean(z))/sd(z))))
+numeric_var <- c("trip_distance" , "fare_amount", "extra" , "mta_tax", "tip_amount","tolls_amount" , "total_amount")
+z_score <- as.data.frame(sapply(tripdata_1[,numeric_var], function(z) (abs(z-mean(z))/sd(z))))
+## finding outliers
+outliers<- function( tripdata_1) {
+  result <- which(abs(tripdata_1) > 3)
+  length(result)
+} 
+apply(z_score,2, outliers)
+## trip_distance, tip_amount, tolls_amount have major number of outliers. box plot visualization of outliers in those 3 variables.
+ggplot(tripdata_1,aes(y = tripdata_1$tip_amount)) + geom_boxplot(outlier.color = "red")
+
+ggplot(tripdata_1,aes(y = tripdata_1$trip_distance)) + geom_boxplot(outlier.color = "blue")
+
+ggplot(tripdata_1,aes(y = tripdata_1$tolls_amount)) + geom_boxplot(outlier.color = "black")
+
+## remove ouliers from the dataset where z-score is more than 2.5.
+outliers_r <- function( tripdata_1) {
+  result <- which(abs(tripdata_1) > 2.5)
+ result
+} 
+out <- apply(z_score,2, outliers_r)
+tripdata_1 <- tripdata_1[-unlist(out), ]
+```
+
+```{r}
+## Target variable TIP AMOUNT distribution correlation. removed 3 non-numeric columns 
+cor(tripdata_1$tip_amount, tripdata_1[, -c(2,3,11)], use = "complete.obs")
+## tip_amount has positive correlation with total_amount, trip_distance, fare_amount, PUlocationID, DOLocationID, passenger count 
+```
+
+```{r}
+########### Feature selection #############
+## for better model selection removing columns having negative correlation with tip_amount
+tripdata_1 <- tripdata_1[, - c(1,2,3,4,10,11,13,14,16,17)]
+
+########## Feature Engineering ############
+## creating new variable passenger_count_category
+tripdata_1 <- cbind(tripdata_1, passenger_count_category = 'NA')
+
+b <- c(-Inf, 0, 1, 2, 200)
+## label of the new factor variable
+names <- c("Zero", "One", "Two","High")
+tripdata_1$passenger_count_category <- cut(tripdata_1$tip_amount, breaks = b, labels = names)
+tripdata_1$passenger_count_category<- as.factor(tripdata_1$passenger_count_category)
+
+table(tripdata_1$passenger_count_category)
+## converting variable to numeric for correlation plot
+tripdata_1$passenger_count_category <- as.numeric(tripdata_1$passenger_count_category)
+class(tripdata_1$passenger_count_category)
+## correlation plot
+cor(tripdata_1$tip_amount, tripdata_1$passenger_count_category)
+m <- cor(tripdata_1,use = "complete.obs")
+corrplot(m, type = "upper")
+## New feature variable passenger count category is highly correlated to tip_amount. Hence, the Variable is worth considering to predict tip_amount.
+```
+
+
+
+Question 2 — (20 points) 
+CRISP-DM: Data Preparation 
+
+```{r}
+tripdata_1 <- tripdata_1[,c("trip_distance","fare_amount","total_amount","tip_amount", "passenger_count_category")]
+## some missing value are there in dataset 
+tripdata_1<-   tripdata_1 %>% 
+  mutate(fare_amount = replace_na(fare_amount,mean(fare_amount, na.rm = TRUE)))
+
+tripdata_1<-   tripdata_1 %>% 
+  mutate(total_amount = replace_na(total_amount,mean(total_amount, na.rm = TRUE)))
+sum(is.na(tripdata_1))
+
+########## Normalize #################
+normalize <- function(x) {
+  return((x - min(x))/ (max(x) - min(x)))
+}
+
+tripdata_1$trip_distance <- normalize(tripdata_1$trip_distance)
+tripdata_1$fare_amount <- normalize(tripdata_1$fare_amount)
+tripdata_1$total_amount <- normalize(tripdata_1$total_amount)
+tripdata_1$tip_amount <- normalize(tripdata_1$tip_amount)
+tripdata_1$passenger_count_category <- normalize(tripdata_1$passenger_count_category)
+
+```
+
+```{r}
+
+## split train and test data into 80-20 
+set.seed(1)
+
+samp_size <- floor(0.8 * nrow(tripdata_1))
+
+train_set <- sample(seq_len(nrow(tripdata_1)), size = samp_size)
+
+data_train_trip <- tripdata_1[train_set,]
+
+data_test_trip <- tripdata_1[-train_set,]
+
+
+train_labels <- tripdata_1[train_set,4]
+test_labels <- tripdata_1[-train_set,4]
+
+
+```
+
+Question 3 — (30 points) 
+CRISP-DM: Modeling 
+
+```{r}
+library(class)
+library(ltm)
+##install.packages("FNN")
+library(FNN)
+knn_predict <- function(data_train_trip, data_test_trip,k){
+  tip_predicted <- knn.reg(data_train_trip, data_test_trip, train_labels, k)
+  tip_pred <- list(tip_predicted$pred)
+  df = data.frame(unlist(test_labels),unlist(tip_pred))
+  names(df) = c("Actual","Predicted")
+  return(mean((test_labels - tip_predicted$pred) ^ 2))
+}
+
+knn_predict_1 <- knn_predict(data_train_trip,data_test_trip,2)
+## knn_predict function results MSE value of 1.611277e-07. 
+## to check accuracy of the model 
+knn_1 <- knn(data_train_trip , data_test_trip, train_labels ,2)
+acc_1 <- 100 * sum(test_labels == knn_1)/NROW(test_labels)
+acc_1
+```
+
+
+QUESTION 4:
+
+```{r}
+k_values = c(2,4,6,8,10,11,13,15,17,19,21,22,23,24,25,26,27,28,30,38)
+k_data <- as.data.frame(k_values)
+k_data$mse_values <- 0
+str(k_data)
+for (i in 1:nrow(k_data)) {
+  k <- k_data$k_values[i]
+  k_data$mse_values[i] <- knn_predict(data_train_trip,data_test_trip,i)
+}
+k_data
+## ## creating a loop for 20 different k values as well as their accuracy to check which values is the most accurate for the prediction.
+k_v = c(2,4,6,8,10,11,13,15,17,19,21,22,23,24,25,26,27,28,30,38)
+k_d <- as.data.frame(k_v)
+k_d$accuracy <- 0
+for (i in 1:nrow(k_d)) {
+  k <- k_d$k_v[i]
+ knn <- knn(data_train_trip , data_test_trip, train_labels , i)
+k_d$accuracy[i] <- 100 * sum(test_labels == knn)/NROW(test_labels)
+}
+k_d
+## #According to the chart, the K Value of 2 represents the smallest mean squared error. Also, as the k value increases, the MSE increases, showing that they are directly proportional.
+
+k_plot <- ggplot(k_data, aes(x = k_values, y = mse_values)) + geom_line() + geom_point(aes(colour = k_values)) + theme_classic() +
+ labs(title = "Analysis of K_Values to Mean Squared Errors" , x = "K Values", y = "Mean Squared Errors" ) 
+k_plot
+```
+
+
+QUESTION 5: Evaluate the effect of the percentage split for the training and test sets and determine if a different split 
+ratio improves your model’s ability to make better predictions. 
+
+```{r}
+library(RCurl)
+# 2 Train:70%, Test:30%
+set.seed(1)
+
+samp_size <- floor(0.7 * nrow(tripdata_1))
+
+train_set <- sample(seq_len(nrow(tripdata_1)), size = samp_size)
+
+data_train_trip <- tripdata_1[train_set,]
+
+data_test_trip <- tripdata_1[-train_set,]
+
+
+train_labels <- tripdata_1[train_set,4]
+test_labels <- tripdata_1[-train_set,4]
+
+knn_predict <- function(data_train_trip, data_test_trip,k){
+  tip_predicted <- knn.reg(data_train_trip, data_test_trip, train_labels, k)
+  tip_pred <- list(tip_predicted$pred)
+  df = data.frame(unlist(test_labels),unlist(tip_pred))
+  names(df) = c("Actual","Predicted")
+  return(mean((test_labels - tip_predicted$pred) ^ 2))
+}
+knn_predict_2 <- knn_predict(data_train_trip,data_test_trip,2)
+## when the split ratio was 80-20 and k=2 MSE return was 1.611277e-07. and when the split ratio changed to 70-30 MSE return 1.886924e-07 with same k value.
+## accuracy for 70-30 split ratio 
+knn_2 <- knn(data_train_trip , data_test_trip, train_labels , 2)
+acc_2 <- 100 * sum(test_labels == knn_2)/NROW(test_labels)
+acc_2
+```
+
+```{r}
+library(RCurl)
+# 3 Train:60%, Test:40%
+
+set.seed(1)
+samp_size <- floor(0.6 * nrow(tripdata_1))
+train_set <- sample(seq_len(nrow(tripdata_1)), size = samp_size)
+data_train_trip <- tripdata_1[train_set,]
+data_test_trip <- tripdata_1[-train_set,]
+train_labels <- tripdata_1[train_set,4]
+test_labels <- tripdata_1[-train_set,4]
+
+knn_predict <- function(data_train_trip, data_test_trip,k){
+  tip_predicted <- knn.reg(data_train_trip, data_test_trip, train_labels, k)
+  tip_pred <- list(tip_predicted$pred)
+  df = data.frame(unlist(test_labels),unlist(tip_pred))
+  names(df) = c("Actual","Predicted")
+  return(mean((test_labels - tip_predicted$pred) ^ 2))
+}
+knn_predict_3 <- knn_predict(data_train_trip,data_test_trip,2)
+## when the split ratio was 70-30 and k=2 MSE return was 1.886924e-07. and when the split ratio changed to 60-40 MSE return 2.104823e-07 with same k value.
+knn_3 <- knn(data_train_trip , data_test_trip, train_labels , 2)
+acc_3 <- 100 * sum(test_labels == knn_3)/NROW(test_labels)
+acc_3
+
+## with 80-20 ratio, the accuracy comes out to be the most perfect that is 99%.On the other hand, the accuracy for 60:40 ratio comes out to be 98% with the same value of k ie 2.Hence,80:20 ratio gives the most accurate result.
+```
+
